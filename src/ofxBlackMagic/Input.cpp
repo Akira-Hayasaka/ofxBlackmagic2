@@ -118,36 +118,48 @@ namespace ofxBlackmagic {
 
 	//---------
 #if defined(_WIN32)
-	HRESULT STDMETHODCALLTYPE Input::VideoInputFormatChanged(/* in */ BMDVideoInputFormatChangedEvents notificationEvents, /* in */ IDeckLinkDisplayMode *newMode, /* in */ BMDDetectedVideoInputFormatFlags detectedSignalFlags) {
-				bool shouldRestartCaptureWithNewVideoMode = true;
+	HRESULT STDMETHODCALLTYPE Input::VideoInputFormatChanged(
+		/* in */ BMDVideoInputFormatChangedEvents notificationEvents, 
+		/* in */ IDeckLinkDisplayMode *newMode, 
+		/* in */ BMDDetectedVideoInputFormatFlags detectedSignalFlags) 
+	{
+		HRESULT			result;
+		BMDPixelFormat	pixelFormat = bmdFormat10BitYUV;
+		BSTR 		displayModeNameStr;
 
-				BMDPixelFormat	pixelFormat = bmdFormat10BitYUV;
+		if (detectedSignalFlags & bmdDetectedVideoInputRGB444)
+			pixelFormat = bmdFormat10BitRGB;
 
-				if (detectedSignalFlags & bmdDetectedVideoInputRGB444) {
-					pixelFormat = bmdFormat10BitRGB;
-				}
+		// Stop the capture
+		input->StopStreams();
 
-				// Restart capture with the new video mode if told to
-				if (shouldRestartCaptureWithNewVideoMode) {
-					// Stop the capture
-					input->StopStreams();
+		// Set the detected video input mode
+		result = input->EnableVideoInput(newMode->GetDisplayMode(), pixelFormat, bmdVideoInputEnableFormatDetection);
+		if (result != S_OK)
+		{
+			fprintf(stderr, "Unable to re-enable video input on auto-format detection");
+			goto bail;
+		}
 
-					// Set the video input mode
-					if (input->EnableVideoInput(newMode->GetDisplayMode(), pixelFormat, bmdVideoInputEnableFormatDetection) != S_OK) {
-						ofLogError("This application was unable to select the new video mode.");
-						goto bail;
-					}
+		// Restart the capture
+		result = input->StartStreams();
+		if (result != S_OK)
+		{
+			fprintf(stderr, "Unable to restart streams on auto-format detection");
+			goto bail;
+		}
 
-					// Start the capture
-					if (input->StartStreams() != S_OK) {
-						ofLogError("This application was unable to start the capture on the selected device.");
-						goto bail;
-					}
+		result = newMode->GetName(&displayModeNameStr);
 
-				}
+		if (result == S_OK)
+		{
+			fprintf(stderr, "Video format changed to %s %s\n", displayModeNameStr, (detectedSignalFlags & bmdDetectedVideoInputRGB444) ? "RGB" : "YUV");
+		}
+		else
+			fprintf(stderr, "Unable to get new video format name\n");
 
-			bail:
-				return S_OK;
+	bail:
+		return result;
 	}
 #elif defined(__APPLE_CC__)
 	HRESULT STDMETHODCALLTYPE Input::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents notificationEvents, IDeckLinkDisplayMode *newDisplayMode, BMDDetectedVideoInputFormatFlags detectedSignalFlags) {
