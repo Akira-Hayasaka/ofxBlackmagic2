@@ -7,11 +7,12 @@
 #include "ofMain.h"
 
 namespace ofxBlackmagic {
+
 	class Output : public IDeckLinkVideoOutputCallback
 	{
 	public:
 
-		Output();
+		Output(const int buffer_w, const int buffer_h);
 		~Output();
 
 		bool start(const DeviceDefinition&, const BMDDisplayMode&);
@@ -33,6 +34,8 @@ namespace ofxBlackmagic {
 
 		BMDTimeValue frameDuration;
 		BMDTimeScale frameTimescale;
+
+		ofBufferObject pixelBufferBack, pixelBufferFront;
 
 		ofPixels pixels[2];
 		ofPixels *front_buffer, *back_buffer;

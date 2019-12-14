@@ -2,8 +2,11 @@
 
 namespace ofxBlackmagic {
 
-	Output::Output() : pDLOutput(NULL), pDLVideoFrame(NULL), has_new_frame(false), mutex(NULL)
+	Output::Output(const int buffer_w, const int buffer_h) : 
+		pDLOutput(NULL), pDLVideoFrame(NULL), has_new_frame(false), mutex(NULL)
 	{
+		pixelBufferBack.allocate(buffer_w * buffer_h * 4, GL_DYNAMIC_READ);
+		pixelBufferFront.allocate(buffer_w * buffer_h * 4, GL_DYNAMIC_READ);
 	}
 
 	Output::~Output()
@@ -139,7 +142,14 @@ namespace ofxBlackmagic {
 			&& tex.getHeight() == uiFrameHeight)
 		{
 			ofPixels pix2;
-			tex.readToPixels(pix2);
+			
+			tex.copyTo(pixelBufferBack);
+			pixelBufferFront.bind(GL_PIXEL_UNPACK_BUFFER);
+			unsigned char * p = pixelBufferFront.map<unsigned char>(GL_READ_ONLY);
+			pix2.setFromExternalPixels(p, tex.getWidth(), tex.getHeight(), OF_PIXELS_RGBA);
+			pixelBufferFront.unmap();
+			pixelBufferFront.unbind(GL_PIXEL_UNPACK_BUFFER);
+			swap(pixelBufferBack, pixelBufferFront);
 
 			mutex->lock();
 			if (!back_buffer->isAllocated() ||
